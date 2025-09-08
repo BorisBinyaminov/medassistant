@@ -105,15 +105,15 @@ jobs:
       - name: Ensure deploy dir exists
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ env.VPS_HOST }}
-          username: ${{ env.VPS_USER }}
-          port: ${{ env.VPS_PORT }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
           key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
-          passphrase: ${{ env.VPS_PASSPHRASE }}
+          passphrase: ${{ secrets.VPS_PASSPHRASE }}
           script: |
             set -euo pipefail
-            echo "Ensuring dir: $DEPLOY_DIR"
-            mkdir -p "$DEPLOY_DIR"
+            mkdir -p "${{ secrets.DEPLOY_DIR }}"
+
 
       - name: Upload compose & source (SCP)
         uses: appleboy/scp-action@v0.1.7
@@ -131,31 +131,35 @@ jobs:
       - name: Deploy on server (compose up -d)
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ env.VPS_HOST }}
-          username: ${{ env.VPS_USER }}
-          port: ${{ env.VPS_PORT }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
           key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
-          passphrase: ${{ env.VPS_PASSPHRASE }}
+          passphrase: ${{ secrets.VPS_PASSPHRASE }}
           script: |
             set -euo pipefail
-            cd "$DEPLOY_DIR"
+
+            cd "${{ secrets.DEPLOY_DIR }}"
 
             mkdir -p artifacts
             tar xzf src.tgz
             rm -f src.tgz
             mv -f docker-compose.rendered.yml docker-compose.yml
 
-            # .env без лидирующих пробелов
-            cat > .env <<'ENV'
-            TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-            OPENAI_API_KEY=${OPENAI_API_KEY}
-            OPENAI_ORG=${OPENAI_ORG}
-            OPENAI_BASE_URL=${OPENAI_BASE_URL}
-            MODEL_REASONING=${MODEL_REASONING}
-            MODEL_FRIENDLY=${MODEL_FRIENDLY}
-            DEBUG=${DEBUG}
+            # генерим .env: подставляем secrets на стороне раннера (НЕ $VAR на сервере)
+            cat > .env <<ENV
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            OPENAI_ORG=${{ secrets.OPENAI_ORG }}
+            OPENAI_BASE_URL=${{ secrets.OPENAI_BASE_URL }}
+            MODEL_REASONING=${{ secrets.MODEL_REASONING }}
+            MODEL_FRIENDLY=${{ secrets.MODEL_FRIENDLY }}
+            DEBUG=${{ secrets.DEBUG }}
             ENV
             chmod 600 .env
+
+            # при необходимости логин в GHCR (если образ приватный):
+            # echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
 
             docker compose up -d --force-recreate
             docker compose ps
