@@ -137,7 +137,17 @@ def next_question(history: List[Dict[str, str]]) -> Dict[str, Any]:
         text = getattr(res, "output_text", None) or ""
         log.debug("interviewer raw response: %s", text)
 
-        parsed_raw = _parse_json_strict(text)
+        try: 
+            parsed_raw = _parse_json_strict(text)
+        except Exception as e:
+            log.exception("interviewer failed: %s", e)
+            # Мягкий фолбэк: если модель вернула короткую реплику без JSON, используем её как вопрос
+            raw = (locals().get("text") or "").strip()
+            if raw and "\n" not in raw and len(raw) <= 200:
+                return {"done": False, "question": raw, "reason": "nonjson-fallback"}
+            # Иначе — жёсткая ошибка
+            raise
+
         # нормализуем ключи к нижнему регистру для устойчивости
         parsed = { (k or "").lower(): v for k, v in parsed_raw.items() }
 
