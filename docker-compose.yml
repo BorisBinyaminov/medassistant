@@ -1,8 +1,8 @@
 services:
   bot:
-    image: __BOT_IMAGE__            # <-- рендерится в GH Actions
+    image: __BOT_IMAGE__
     env_file:
-      - ./.env                      # TELEGRAM_BOT_TOKEN, OPENAI_API_KEY, ...
+      - ./.env
     environment:
       PYTHONPATH: /app
     working_dir: /app
