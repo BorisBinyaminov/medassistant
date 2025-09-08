@@ -1,58 +1,105 @@
-- name: Checkout
-  uses: actions/checkout@v4
-  with:
-    fetch-depth: 0
-    ref: main
+name: Deploy to VPS
 
-# Диагностика: увидеть, что реально в рабочей папке
-- name: List files
-  run: |
-    pwd
-    ls -la
-    echo "---- tree (top level) ----"
-    ls -la bot || true
-    ls -la tests || true
+on:
+  push:
+    branches: [ main ]
 
-# Копируем весь репозиторий (точка = всё из корня)
-- name: Upload project to VPS (copy all)
-  uses: appleboy/scp-action@v0.1.7
-  with:
-    host: ${{ secrets.VPS_HOST }}
-    username: root
-    password: ${{ secrets.VPS_PASSPHRASE }}
-    source: |
-         bot/**
-         tests/**
-         requirements.txt
-    target: ${{ secrets.VPS_PATH }}
-    overwrite: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
 
-- name: Build on VPS & restart
-  uses: appleboy/ssh-action@v1.2.0
-  with:
-    host: ${{ secrets.VPS_HOST }}
-    username: root
-    password: ${{ secrets.VPS_PASSPHRASE }}
-    script: |
-      set -e
-      mkdir -p "${{ secrets.VPS_PATH }}"
-      cd "${{ secrets.VPS_PATH }}"
-      [ -d .venv ] || python3 -m venv .venv
-      . .venv/bin/activate
-      python -m pip install --upgrade pip
-      python -m pip install -r requirements.txt
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
 
-      cat > .env <<'ENV'
-      TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
-      OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-      OPENAI_ORG=${{ secrets.OPENAI_ORG }}
-      OPENAI_BASE_URL=${{ secrets.OPENAI_BASE_URL }}
-      MODEL_REASONING=${{ secrets.MODEL_REASONING }}
-      MODEL_FRIENDLY=${{ secrets.MODEL_FRIENDLY }}
-      DEBUG=${{ secrets.DEBUG }}
-      ENV
+      - name: List files (diagnostics)
+        run: |
+          pwd
+          ls -la
+          echo "---- tree (top level) ----"
+          ls -la bot || true
+          ls -la tests || true
 
-      mkdir -p artifacts/db artifacts/compare
-      systemctl daemon-reload || true
-      systemctl restart medassistant.service || true
-      systemctl --no-pager -l status medassistant.service || true
+      # Копируем весь репозиторий в целевую директорию на VPS
+      - name: Upload project to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}           # напр. 79.132.138.73
+          username: root
+          password: ${{ secrets.VPS_PASSPHRASE }} # пароль root
+          source: |
+            ./*
+          target: ${{ secrets.VPS_PATH }}         # напр. /opt/medassistant
+          overwrite: true
+
+      # Ставим зависимости, собираем .env из Secrets, создаём/рестартим systemd-сервис
+      - name: Build on VPS & restart service
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          password: ${{ secrets.VPS_PASSPHRASE }}
+          script: |
+            set -euo pipefail
+
+            APP_DIR="${{ secrets.VPS_PATH }}"
+            SERVICE_NAME="medassistant"
+
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
+
+            # Python venv
+            if [ ! -d ".venv" ]; then
+              python3 -m venv .venv
+            fi
+            . .venv/bin/activate
+            python -m pip install --upgrade pip
+            if [ -f requirements.txt ]; then
+              python -m pip install -r requirements.txt
+            fi
+
+            # Создаём .env из GitHub Secrets (не хранится в гите)
+            cat > .env <<'ENV'
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            OPENAI_ORG=${{ secrets.OPENAI_ORG }}
+            OPENAI_BASE_URL=${{ secrets.OPENAI_BASE_URL }}
+            MODEL_REASONING=${{ secrets.MODEL_REASONING }}
+            MODEL_FRIENDLY=${{ secrets.MODEL_FRIENDLY }}
+            DEBUG=${{ secrets.DEBUG }}
+            ENV
+            chmod 600 .env
+
+            # systemd unit (создаём/обновляем)
+            cat > /etc/systemd/system/${SERVICE_NAME}.service <<'UNIT'
+            [Unit]
+            Description=MedAssistant Telegram Bot
+            After=network-online.target
+            Wants=network-online.target
+
+            [Service]
+            Type=simple
+            WorkingDirectory=${{ secrets.VPS_PATH }}
+            EnvironmentFile=${{ secrets.VPS_PATH }}/.env
+            ExecStart=${{ secrets.VPS_PATH }}/.venv/bin/python -m bot.main
+            Restart=always
+            RestartSec=5
+            User=root
+            Group=root
+            # Логи в journalctl
+            StandardOutput=journal
+            StandardError=journal
+
+            [Install]
+            WantedBy=multi-user.target
+            UNIT
+
+            systemctl daemon-reload
+            systemctl enable ${SERVICE_NAME}.service || true
+            systemctl restart ${SERVICE_NAME}.service
+
+            # Показать статус (всегда завершаться успешно, чтобы не ломать пайплайн)
+            systemctl --no-pager -l status ${SERVICE_NAME}.service || true
