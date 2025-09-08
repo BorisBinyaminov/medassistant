@@ -125,6 +125,27 @@ jobs:
           passphrase: ${{ env.VPS_PASSPHRASE }}
           script: |
             set -euo pipefail
+
+            # 1) Установим Docker + Compose v2, если их нет
+            if ! command -v docker >/dev/null 2>&1; then
+              echo "→ Installing Docker..."
+              curl -fsSL https://get.docker.com | sh
+              systemctl enable docker
+              systemctl start docker
+            fi
+
+            if ! docker compose version >/dev/null 2>&1; then
+              echo "→ Installing docker compose plugin..."
+              # На большинстве Ubuntu compose-plugin прилетает вместе с get.docker.com,
+              # но на всякий случай:
+              apt-get update -y || true
+              apt-get install -y docker-compose-plugin || true
+            fi
+
+            docker --version
+            docker compose version
+
+            # 2) Перейдём в директорию деплоя
             cd "${{ env.DEPLOY_DIR }}"
 
             mkdir -p artifacts
@@ -132,7 +153,7 @@ jobs:
             rm -f src.tgz
             mv -f docker-compose.rendered.yml docker-compose.yml
 
-            # .env без лидирующих пробелов
+            # 3) Сгенерируем .env без ведущих пробелов
             cat > .env <<ENV
             TELEGRAM_BOT_TOKEN=${{ env.TELEGRAM_BOT_TOKEN }}
             OPENAI_API_KEY=${{ env.OPENAI_API_KEY }}
@@ -142,11 +163,12 @@ jobs:
             MODEL_FRIENDLY=${{ env.MODEL_FRIENDLY }}
             DEBUG=${{ env.DEBUG }}
             ENV
-            chmod 600 .env
+              chmod 600 .env
 
-            # Если образ приватный, можно разлогиниться в GHCR:
+            # 4) (опционально) логин в GHCR, если образ приватный
             # echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
 
+            # 5) Запускаем
             docker compose up -d --force-recreate
             docker compose ps
             CID="$(docker compose ps -q bot)"
