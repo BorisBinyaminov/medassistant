@@ -1,8 +1,12 @@
-.git
-.github
-artifacts/
-tests/
+# лишнее в образ не тащим
 __pycache__/
 *.pyc
-.env*
-README.md
+*.pyo
+*.pyd
+*.log
+.env
+artifacts/
+tests/
+.git
+.gitignore
+.dockerignore

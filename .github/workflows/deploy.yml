@@ -39,11 +39,17 @@ jobs:
           context: .
           file: bot/Dockerfile
           push: true
+          # ускоряем сборку
+          provenance: false
+          sbom: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ghcr.io/${{ env.REPO_LC }}/bot:latest
             ghcr.io/${{ env.REPO_LC }}/bot:sha-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.source=${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
   deploy:
     needs: build-and-push
@@ -70,12 +76,12 @@ jobs:
       - name: Validate required secrets
         run: |
           set -euo pipefail
-          check() { [ -n "$2" ] || { echo "❌ Missing secret: $1"; exit 1; }; }
-          check DEPLOY_DIR  "$DEPLOY_DIR"
-          check VPS_HOST    "$VPS_HOST"
-          check VPS_USER    "$VPS_USER"
-          check VPS_PORT    "$VPS_PORT"
-          check VPS_SSH_KEY "$VPS_SSH_KEY"
+          req() { [ -n "$2" ] || { echo "❌ Missing secret: $1"; exit 1; }; }
+          req DEPLOY_DIR  "$DEPLOY_DIR"
+          req VPS_HOST    "$VPS_HOST"
+          req VPS_USER    "$VPS_USER"
+          req VPS_PORT    "$VPS_PORT"
+          req VPS_SSH_KEY "$VPS_SSH_KEY"
 
       - name: Render compose with GHCR image & absolute DEPLOY_DIR
         run: |
@@ -105,8 +111,8 @@ jobs:
           host: ${{ env.VPS_HOST }}
           username: ${{ env.VPS_USER }}
           port: ${{ env.VPS_PORT }}
-          key: ${{ env.VPS_SSH_KEY }}          # <-- ключ целиком из секрета
-          passphrase: ${{ env.VPS_PASSPHRASE }} # <-- пароль ключа (если есть)
+          key: ${{ env.VPS_SSH_KEY }}
+          passphrase: ${{ env.VPS_PASSPHRASE }}
           script: |
             set -euo pipefail
             mkdir -p "${{ env.DEPLOY_DIR }}"
@@ -117,7 +123,7 @@ jobs:
           host: ${{ env.VPS_HOST }}
           username: ${{ env.VPS_USER }}
           port: ${{ env.VPS_PORT }}
-          key: ${{ env.VPS_SSH_KEY }}          # <-- ключ целиком из секрета
+          key: ${{ env.VPS_SSH_KEY }}
           passphrase: ${{ env.VPS_PASSPHRASE }}
           source: "./docker-compose.rendered.yml,./src.tgz"
           target: "${{ env.DEPLOY_DIR }}/"
@@ -130,39 +136,34 @@ jobs:
           host: ${{ env.VPS_HOST }}
           username: ${{ env.VPS_USER }}
           port: ${{ env.VPS_PORT }}
-          key: ${{ env.VPS_SSH_KEY }}          # <-- ключ целиком из секрета
+          key: ${{ env.VPS_SSH_KEY }}
           passphrase: ${{ env.VPS_PASSPHRASE }}
           script: |
             set -euo pipefail
 
-            # 1) Установим Docker + Compose v2, если их нет
+            # 1) Docker & Compose
             if ! command -v docker >/dev/null 2>&1; then
               echo "→ Installing Docker..."
               curl -fsSL https://get.docker.com | sh
               systemctl enable docker
               systemctl start docker
             fi
-
             if ! docker compose version >/dev/null 2>&1; then
               echo "→ Installing docker compose plugin..."
-              # На большинстве Ubuntu compose-plugin прилетает вместе с get.docker.com,
-              # но на всякий случай:
               apt-get update -y || true
               apt-get install -y docker-compose-plugin || true
             fi
-
             docker --version
             docker compose version
 
-            # 2) Перейдём в директорию деплоя
+            # 2) unpack
             cd "${{ env.DEPLOY_DIR }}"
-
             mkdir -p artifacts
             tar xzf src.tgz
             rm -f src.tgz
             mv -f docker-compose.rendered.yml docker-compose.yml
 
-            # 3) Сгенерируем .env без ведущих пробелов
+            # 3) .env
             cat > .env <<ENV
             TELEGRAM_BOT_TOKEN=${{ env.TELEGRAM_BOT_TOKEN }}
             OPENAI_API_KEY=${{ env.OPENAI_API_KEY }}
@@ -171,12 +172,9 @@ jobs:
             MODEL_FRIENDLY=${{ env.MODEL_FRIENDLY }}
             DEBUG=${{ env.DEBUG }}
             ENV
-              chmod 600 .env
+            chmod 600 .env
 
-            # 4) (опционально) логин в GHCR, если образ приватный
-            # echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
-
-            # 5) Запускаем
+            # 4) up
             docker compose up -d --force-recreate
             docker compose ps
             CID="$(docker compose ps -q bot)"
