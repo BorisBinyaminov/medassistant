@@ -1,0 +1,35 @@
+{"case_id": "case_03d12fa05e41", "user_id": 5102625060, "role": "patient_text", "fragment": "у меня болит голова", "source": {"type": "telegram_text", "message_id": 1773}, "created_at": "2025-09-08T08:09:31Z"}
+{"case_id": "case_0257f65719f0", "user_id": 5102625060, "role": "patient_text", "fragment": "у меня болит голова", "source": {"type": "telegram_text", "message_id": 1775}, "created_at": "2025-09-08T08:09:46Z"}
+{"case_id": "case_294d9475bf55", "user_id": 5102625060, "role": "patient_text", "fragment": "/review case_0257f65719f0", "source": {"type": "telegram_text", "message_id": 1777}, "created_at": "2025-09-08T08:09:59Z"}
+{"case_id": "case_dcf9bd7569e9", "user_id": 5102625060, "role": "patient_text", "fragment": "болит голова", "source": {"type": "intake_question", "message_id": 1783}, "created_at": "2025-09-08T08:15:06Z"}
+{"case_id": "case_dcf9bd7569e9", "user_id": 5102625060, "role": "patient_text", "fragment": "2 часа назад, ухудшается", "source": {"type": "intake_question", "message_id": 1785}, "created_at": "2025-09-08T08:15:17Z"}
+{"case_id": "case_dcf9bd7569e9", "user_id": 5102625060, "role": "patient_text", "fragment": "сильная", "source": {"type": "intake_question", "message_id": 1787}, "created_at": "2025-09-08T08:15:23Z"}
+{"case_id": "case_dcf9bd7569e9", "user_id": 5102625060, "role": "patient_text", "fragment": "нурофен облегчает", "source": {"type": "intake_question", "message_id": 1789}, "created_at": "2025-09-08T08:15:36Z"}
+{"case_id": "case_dcf9bd7569e9", "user_id": 5102625060, "role": "patient_text", "fragment": "нет", "source": {"type": "intake_question", "message_id": 1791}, "created_at": "2025-09-08T08:15:39Z"}
+{"case_id": "case_dcf9bd7569e9", "user_id": 5102625060, "role": "patient_text", "fragment": "нет", "source": {"type": "intake_question", "message_id": 1793}, "created_at": "2025-09-08T08:15:41Z"}
+{"case_id": "case_dcf9bd7569e9", "user_id": 5102625060, "role": "patient_text", "fragment": "нет", "source": {"type": "intake_question", "message_id": 1795}, "created_at": "2025-09-08T08:15:45Z"}
+{"case_id": "case_dcf9bd7569e9", "user_id": 5102625060, "role": "patient_text", "fragment": "35, male", "source": {"type": "intake_question", "message_id": 1797}, "created_at": "2025-09-08T08:15:55Z"}
+{"case_id": "case_dcf9bd7569e9", "user_id": 5102625060, "role": "patient_text", "fragment": "РНК Coronavirus SARS-CoV-2 ОТРИЦАТЕЛЬНЫЙ", "source": {"type": "add_text", "message_id": 1801}, "created_at": "2025-09-08T08:16:49Z"}
+{"case_id": "case_4481c93f5c6b", "user_id": 5102625060, "role": "patient_text", "fragment": "болит голова", "source": {"type": "intake_question", "message_id": 1809}, "created_at": "2025-09-08T08:29:40Z"}
+{"case_id": "case_4481c93f5c6b", "user_id": 5102625060, "role": "patient_text", "fragment": "час назад, ухудшается", "source": {"type": "intake_question", "message_id": 1811}, "created_at": "2025-09-08T08:29:49Z"}
+{"case_id": "case_4481c93f5c6b", "user_id": 5102625060, "role": "patient_text", "fragment": "сильная", "source": {"type": "intake_question", "message_id": 1813}, "created_at": "2025-09-08T08:29:59Z"}
+{"case_id": "case_4481c93f5c6b", "user_id": 5102625060, "role": "patient_text", "fragment": "нурофен облегчает", "source": {"type": "intake_question", "message_id": 1815}, "created_at": "2025-09-08T08:30:04Z"}
+{"case_id": "case_4481c93f5c6b", "user_id": 5102625060, "role": "patient_text", "fragment": "нет", "source": {"type": "intake_question", "message_id": 1817}, "created_at": "2025-09-08T08:30:08Z"}
+{"case_id": "case_4481c93f5c6b", "user_id": 5102625060, "role": "patient_text", "fragment": "нет", "source": {"type": "intake_question", "message_id": 1819}, "created_at": "2025-09-08T08:30:10Z"}
+{"case_id": "case_4481c93f5c6b", "user_id": 5102625060, "role": "patient_text", "fragment": "нет", "source": {"type": "intake_question", "message_id": 1821}, "created_at": "2025-09-08T08:30:12Z"}
+{"case_id": "case_4481c93f5c6b", "user_id": 5102625060, "role": "patient_text", "fragment": "46, male", "source": {"type": "intake_question", "message_id": 1823}, "created_at": "2025-09-08T08:30:20Z"}
+{"case_id": "case_1aa1114f7294", "user_id": 5102625060, "role": "patient_text", "fragment": "болит голова", "source": {"type": "intake_question", "message_id": 1830}, "created_at": "2025-09-08T08:35:48Z"}
+{"case_id": "case_1aa1114f7294", "user_id": 5102625060, "role": "patient_text", "fragment": "час назад, ухудшается", "source": {"type": "intake_question", "message_id": 1832}, "created_at": "2025-09-08T08:35:58Z"}
+{"case_id": "case_1aa1114f7294", "user_id": 5102625060, "role": "patient_text", "fragment": "сильная", "source": {"type": "intake_question", "message_id": 1834}, "created_at": "2025-09-08T08:36:02Z"}
+{"case_id": "case_1aa1114f7294", "user_id": 5102625060, "role": "patient_text", "fragment": "нурофен облегчает", "source": {"type": "intake_question", "message_id": 1836}, "created_at": "2025-09-08T08:36:09Z"}
+{"case_id": "case_1aa1114f7294", "user_id": 5102625060, "role": "patient_text", "fragment": "нет", "source": {"type": "intake_question", "message_id": 1838}, "created_at": "2025-09-08T08:36:11Z"}
+{"case_id": "case_1aa1114f7294", "user_id": 5102625060, "role": "patient_text", "fragment": "нет", "source": {"type": "intake_question", "message_id": 1840}, "created_at": "2025-09-08T08:36:12Z"}
+{"case_id": "case_1aa1114f7294", "user_id": 5102625060, "role": "patient_text", "fragment": "нет", "source": {"type": "intake_question", "message_id": 1842}, "created_at": "2025-09-08T08:36:13Z"}
+{"case_id": "case_1aa1114f7294", "user_id": 5102625060, "role": "patient_text", "fragment": "46, муж", "source": {"type": "intake_question", "message_id": 1844}, "created_at": "2025-09-08T08:36:19Z"}
+{"case_id": "case_85374ade1103", "user_id": 5102625060, "role": "patient_text", "fragment": "болит голова", "source": {"type": "intake_dynamic", "message_id": 1854}, "created_at": "2025-09-08T08:58:01Z"}
+{"case_id": "case_09205fc8e0ad", "user_id": 5102625060, "role": "patient_text", "fragment": "болит голова", "source": {"type": "intake_dynamic", "message_id": 1860}, "created_at": "2025-09-08T09:02:40Z"}
+{"case_id": "case_4b4fe2d0d6f8", "user_id": 5102625060, "role": "patient_text", "fragment": "болит голова", "source": {"type": "intake_dynamic", "message_id": 1867}, "created_at": "2025-09-08T09:04:26Z"}
+{"case_id": "case_6b2d9ab5351c", "user_id": 5102625060, "role": "patient_text", "fragment": "болит голова", "source": {"type": "intake_dynamic", "message_id": 1874}, "created_at": "2025-09-08T09:08:18Z"}
+{"case_id": "case_8ffab582b954", "user_id": 5102625060, "role": "patient_text", "fragment": "болит голова", "source": {"type": "intake_dynamic", "message_id": 1880}, "created_at": "2025-09-08T09:09:39Z"}
+{"case_id": "case_12624c2906d6", "user_id": 5102625060, "role": "patient_text", "fragment": "болит голова", "source": {"type": "intake_dynamic", "message_id": 1884}, "created_at": "2025-09-08T09:14:44Z"}
+{"case_id": "case_a3bfbbfb64c3", "user_id": 5102625060, "role": "patient_text", "fragment": "болит голова", "source": {"type": "intake_dynamic", "message_id": 1888}, "created_at": "2025-09-08T09:16:15Z"}

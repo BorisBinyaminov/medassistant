@@ -1,0 +1,9 @@
+aiogram>=3.6
+openai>=1.40
+pydantic>=2.7
+pillow>=10.3
+pdfplumber>=0.11
+pytesseract>=0.3
+python-dotenv>=1.0
+json
+html

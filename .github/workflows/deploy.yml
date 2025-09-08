@@ -1,0 +1,56 @@
+name: Deploy to VPS
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upload project to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}     # 79.132.138.73
+          username: root
+          password: ${{ secrets.VPS_PASSPHRASE }}
+          source: |
+            bot/*
+            tests/*
+            artifacts/*
+            requirements.txt
+          target: ${{ secrets.VPS_PATH }}
+          strip_components: 0
+          overwrite: true
+
+      - name: Build on VPS & restart
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          password: ${{ secrets.VPS_PASSPHRASE }}
+          script: |
+            set -e
+            cd "${{ secrets.VPS_PATH }}"
+            [ -d .venv ] || python3 -m venv .venv
+            . .venv/bin/activate
+            python -m pip install --upgrade pip
+            python -m pip install -r requirements.txt
+
+            cat > .env <<'ENV'
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            OPENAI_ORG=${{ secrets.OPENAI_ORG }}
+            OPENAI_BASE_URL=${{ secrets.OPENAI_BASE_URL }}
+            MODEL_REASONING=${{ secrets.MODEL_REASONING }}
+            MODEL_FRIENDLY=${{ secrets.MODEL_FRIENDLY }}
+            DEBUG=${{ secrets.DEBUG }}
+            ENV
+
+            mkdir -p artifacts/db artifacts/compare
+            sudo systemctl daemon-reload
+            sudo systemctl restart medassistant.service
+            sudo systemctl --no-pager -l status medassistant.service || true
