@@ -50,16 +50,12 @@ jobs:
           DEP="${{ secrets.DEPLOY_DIR }}"
           sed "s|__BOT_IMAGE__|${IMG}|g" docker-compose.yml > docker-compose.rendered.yml
           sed -i "s|\${DEPLOY_DIR}|${DEP}|g" docker-compose.rendered.yml
-          echo "== Compose debug =="
-          echo "-- image lines --";  grep -nE '^\s*image:' docker-compose.rendered.yml || true
-          echo "-- volumes lines --"; grep -nE '^\s*-\s*/' docker-compose.rendered.yml || true
+          echo "== Compose debug =="; grep -nE '^\s*image:|^\s*-\s*/' docker-compose.rendered.yml || true
 
       - name: Pack source tree for server (git ls-files)
         run: |
           set -euo pipefail
-          git ls-files \
-            | grep -vE '^\.github/|^\.env$|^artifacts/|^README\.md$' \
-            > /tmp/filelist.txt
+          git ls-files | grep -vE '^\.github/|^\.env$|^artifacts/|^README\.md$' > /tmp/filelist.txt
           tar -czf src.tgz -T /tmp/filelist.txt
           ls -lh src.tgz
 
@@ -69,7 +65,19 @@ jobs:
           test -s ./docker-compose.rendered.yml
           test -s ./src.tgz
 
-      # NEW: заранее создадим директорию деплоя на сервере (на случай, если её нет)
+      # ⬇️ СНАЧАЛА готовим ключ
+      - name: Prepare SSH key (outside workspace)
+        id: prep-key
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEY_PATH="$RUNNER_TEMP/medassistant_id"
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > "$KEY_PATH"
+          sed -i 's/\r$//' "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          echo "KEY_PATH=$KEY_PATH" >> "$GITHUB_OUTPUT"
+
+      # ⬇️ Потом — создаём каталог деплоя на сервере
       - name: Ensure deploy dir exists
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -82,30 +90,7 @@ jobs:
             set -euo pipefail
             mkdir -p "${{ secrets.DEPLOY_DIR }}"
 
-      - name: Prepare SSH key (outside workspace)
-        id: prep-key
-        shell: bash
-        run: |
-          set -euo pipefail
-          KEY_PATH="$RUNNER_TEMP/medassistant_id"
-          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > "$KEY_PATH"
-          sed -i 's/\r$//' "$KEY_PATH"
-          chmod 600 "$KEY_PATH"
-          echo "KEY_PATH=$KEY_PATH" >> "$GITHUB_OUTPUT"
-
-      - name: Upload compose & source (SCP)
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          port: ${{ secrets.VPS_PORT }}
-          key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
-          passphrase: ${{ secrets.VPS_PASSPHRASE }}
-          source: "./docker-compose.rendered.yml,./src.tgz"
-          target: "${{ secrets.DEPLOY_DIR }}/"
-          overwrite: true
-          debug: true
-
+      # ⬇️ Один SCP-шага достаточно
       - name: Upload compose & source (SCP)
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -131,10 +116,13 @@ jobs:
             set -euo pipefail
             DEPLOY_DIR="${{ secrets.DEPLOY_DIR }}"
             cd "$DEPLOY_DIR"
+
             mkdir -p artifacts
             tar xzf src.tgz
             rm -f src.tgz
             mv -f docker-compose.rendered.yml docker-compose.yml
+
+            # ВАЖНО: без отступов в heredoc
             cat > .env <<'ENV'
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
@@ -145,6 +133,10 @@ jobs:
             DEBUG=${{ secrets.DEBUG }}
             ENV
             chmod 600 .env
+
+            # Если образ в GHCR приватный — раскомментируй и добавь секреты:
+            # echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+
             docker compose up -d --force-recreate
             docker compose ps
             CID="$(docker compose ps -q bot)"
