@@ -19,7 +19,7 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")  # must be set
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")          # must be set
 
 # === Опциональные ===
-OPENAI_ORG = os.environ.get("OPENAI_ORG")
+#OPENAI_ORG = os.environ.get("OPENAI_ORG")
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
 MODEL_REASONING = os.environ.get("MODEL_REASONING", "gpt-5")
 MODEL_FRIENDLY  = os.environ.get("MODEL_FRIENDLY", "gpt-5-chat")

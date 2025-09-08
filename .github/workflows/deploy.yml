@@ -48,7 +48,6 @@ jobs:
 
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      OPENAI_ORG: ${{ secrets.OPENAI_ORG }}
       OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
       MODEL_REASONING: ${{ secrets.MODEL_REASONING }}
       MODEL_FRIENDLY: ${{ secrets.MODEL_FRIENDLY }}
@@ -157,7 +156,6 @@ jobs:
             cat > .env <<ENV
             TELEGRAM_BOT_TOKEN=${{ env.TELEGRAM_BOT_TOKEN }}
             OPENAI_API_KEY=${{ env.OPENAI_API_KEY }}
-            OPENAI_ORG=${{ env.OPENAI_ORG }}
             OPENAI_BASE_URL=${{ env.OPENAI_BASE_URL }}
             MODEL_REASONING=${{ env.MODEL_REASONING }}
             MODEL_FRIENDLY=${{ env.MODEL_FRIENDLY }}

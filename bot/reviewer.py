@@ -20,7 +20,6 @@ _httpx = httpx.Client(
 
 _client = OpenAI(
     api_key=config.OPENAI_API_KEY,
-    organization=config.OPENAI_ORG,
     base_url=config.OPENAI_BASE_URL,
     http_client=_httpx,
 )
