@@ -18,7 +18,7 @@ log = logging.getLogger("interviewer")
 _client = OpenAI(
     api_key=config.OPENAI_API_KEY,
     base_url=config.OPENAI_BASE_URL,
-    organization=(config.OPENAI_ORG or None),
+    organization=None,
 )
 
 
