@@ -73,10 +73,10 @@ jobs:
       - name: Ensure deploy dir exists
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          port: ${{ secrets.SSH_PORT }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
           passphrase: ${{ secrets.VPS_PASSPHRASE }}
           script: |
             set -euo pipefail
@@ -96,9 +96,22 @@ jobs:
       - name: Upload compose & source (SCP)
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          port: ${{ secrets.SSH_PORT }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
+          passphrase: ${{ secrets.VPS_PASSPHRASE }}
+          source: "./docker-compose.rendered.yml,./src.tgz"
+          target: "${{ secrets.DEPLOY_DIR }}/"
+          overwrite: true
+          debug: true
+
+      - name: Upload compose & source (SCP)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
           key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
           passphrase: ${{ secrets.VPS_PASSPHRASE }}
           source: "./docker-compose.rendered.yml,./src.tgz"
@@ -109,22 +122,19 @@ jobs:
       - name: Deploy on server (compose up -d)
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          port: ${{ secrets.SSH_PORT }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
           key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
           passphrase: ${{ secrets.VPS_PASSPHRASE }}
           script: |
             set -euo pipefail
             DEPLOY_DIR="${{ secrets.DEPLOY_DIR }}"
             cd "$DEPLOY_DIR"
-
             mkdir -p artifacts
             tar xzf src.tgz
             rm -f src.tgz
             mv -f docker-compose.rendered.yml docker-compose.yml
-
-            # NEW: создадим .env из секретов (compose его читает как env_file)
             cat > .env <<'ENV'
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
@@ -135,20 +145,7 @@ jobs:
             DEBUG=${{ secrets.DEBUG }}
             ENV
             chmod 600 .env
-
-            # NEW: логин в GHCR (если образ приватный — иначе можно пропустить)
-            if [ -n "${{ secrets.GHCR_USERNAME }}" ] && [ -n "${{ secrets.GHCR_TOKEN }}" ]; then
-              echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
-            fi
-
-            # запуск
             docker compose up -d --force-recreate
             docker compose ps
-
-            echo "== On-server compose snippet =="
-            grep -nE '^\s*image:' docker-compose.yml || true
-            grep -nE '^\s*-\s*/' docker-compose.yml || true
-
-            echo "== Mounts in bot (Source => Destination) =="
             CID="$(docker compose ps -q bot)"
             docker inspect -f '{{range .Mounts}}{{.Source}} => {{.Destination}}{{println}}{{end}}' "$CID" || true
