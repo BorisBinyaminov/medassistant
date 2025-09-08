@@ -12,8 +12,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-            fetch-depth: 0
-            ref: main
+          fetch-depth: 0
+          ref: main
+
+      - name: Prepare SSH key (from secret)
+        id: prep-key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ./_ssh
+          # пишем приватный ключ в файл (многострочный секрет)
+          cat > ./_ssh/id_key <<'KEY'
+          ${{ secrets.VPS_SSH_KEY }}
+          KEY
+          # нормализуем окончания строк на случай CRLF
+          sed -i 's/\r$//' ./_ssh/id_key
+          chmod 600 ./_ssh/id_key
+          echo "KEY_PATH=$GITHUB_WORKSPACE/_ssh/id_key" >> $GITHUB_OUTPUT
 
       - name: List files (diagnostics)
         run: |
@@ -22,27 +37,28 @@ jobs:
           echo "---- bot ----"; ls -la bot || true
           echo "---- tests ----"; ls -la tests || true
 
-      # Копируем весь репозиторий на сервер по SSH-ключу с passphrase
       - name: Upload project to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.VPS_HOST }}            # напр. 79.132.138.73
+          host: ${{ secrets.VPS_HOST }}              # напр. 79.132.138.73
           username: root
-          key: ${{ secrets.VPS_SSH_KEY }}          # приватный ключ (целиком, многострочный)
-          passphrase: ${{ secrets.VPS_PASSPHRASE }}# пароль от ключа
-          # host_fingerprint: ${{ secrets.VPS_HOST_FINGERPRINT }} # опционально, если добавишь
+          key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
+          passphrase: ${{ secrets.VPS_PASSPHRASE }}  # если у ключа есть passphrase
+          port: ${{ secrets.VPS_PORT || 22 }}
           source: |
             ./*
-          target: ${{ secrets.VPS_PATH }}          # напр. /opt/medassistant
+          target: ${{ secrets.VPS_PATH }}            # напр. /opt/medassistant
           overwrite: true
+          # host_fingerprint: ${{ secrets.VPS_HOST_FINGERPRINT }} # опционально
 
       - name: Build on VPS & restart service
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: root
-          key: ${{ secrets.VPS_SSH_KEY }}
+          key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
           passphrase: ${{ secrets.VPS_PASSPHRASE }}
+          port: ${{ secrets.VPS_PORT || 22 }}
           # host_fingerprint: ${{ secrets.VPS_HOST_FINGERPRINT }} # опционально
           script: |
             set -euo pipefail
@@ -71,10 +87,10 @@ jobs:
             MODEL_FRIENDLY=${{ secrets.MODEL_FRIENDLY }}
             DEBUG=${{ secrets.DEBUG }}
             ENV
-            chmod 600 .env
+              chmod 600 .env
 
-            # systemd unit
-            cat > /etc/systemd/system/${SERVICE_NAME}.service <<'UNIT'
+              # systemd unit
+              cat > /etc/systemd/system/${SERVICE_NAME}.service <<'UNIT'
             [Unit]
             Description=MedAssistant Telegram Bot
             After=network-online.target
