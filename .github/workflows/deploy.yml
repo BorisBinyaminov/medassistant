@@ -35,120 +35,120 @@ jobs:
             ghcr.io/${{ env.REPO_LC }}/bot:latest
             ghcr.io/${{ env.REPO_LC }}/bot:sha-${{ github.sha }}
 
-deploy:
-  needs: build-and-push
-  runs-on: ubuntu-latest
-  steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Render compose with GHCR image & absolute DEPLOY_DIR
-      run: |
-        set -euo pipefail
-        REPO_LC="${GITHUB_REPOSITORY,,}"
-        IMG="ghcr.io/${REPO_LC}/bot:latest"
-        DEP="${{ secrets.DEPLOY_DIR }}"
-        sed "s|__BOT_IMAGE__|${IMG}|g" docker-compose.yml > docker-compose.rendered.yml
-        sed -i "s|\${DEPLOY_DIR}|${DEP}|g" docker-compose.rendered.yml
-        echo "== Compose debug =="
-        echo "-- image lines --";  grep -nE '^\s*image:' docker-compose.rendered.yml || true
-        echo "-- volumes lines --"; grep -nE '^\s*-\s*/' docker-compose.rendered.yml || true
-
-    - name: Pack source tree for server (git ls-files)
-      run: |
-        set -euo pipefail
-        git ls-files \
-          | grep -vE '^\.github/|^\.env$|^artifacts/|^README\.md$' \
-          > /tmp/filelist.txt
-        tar -czf src.tgz -T /tmp/filelist.txt
-        ls -lh src.tgz
-
-    - name: Verify payload exists
-      run: |
-        set -euo pipefail
-        test -s ./docker-compose.rendered.yml
-        test -s ./src.tgz
-
-    # NEW: заранее создадим директорию деплоя на сервере (на случай, если её нет)
-    - name: Ensure deploy dir exists
-      uses: appleboy/ssh-action@v1.2.0
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USER }}
-        port: ${{ secrets.SSH_PORT }}
-        key: ${{ secrets.VPS_SSH_KEY }}
-        passphrase: ${{ secrets.VPS_PASSPHRASE }}
-        script: |
+      - name: Render compose with GHCR image & absolute DEPLOY_DIR
+        run: |
           set -euo pipefail
-          mkdir -p "${{ secrets.DEPLOY_DIR }}"
+          REPO_LC="${GITHUB_REPOSITORY,,}"
+          IMG="ghcr.io/${REPO_LC}/bot:latest"
+          DEP="${{ secrets.DEPLOY_DIR }}"
+          sed "s|__BOT_IMAGE__|${IMG}|g" docker-compose.yml > docker-compose.rendered.yml
+          sed -i "s|\${DEPLOY_DIR}|${DEP}|g" docker-compose.rendered.yml
+          echo "== Compose debug =="
+          echo "-- image lines --";  grep -nE '^\s*image:' docker-compose.rendered.yml || true
+          echo "-- volumes lines --"; grep -nE '^\s*-\s*/' docker-compose.rendered.yml || true
 
-    - name: Prepare SSH key (outside workspace)
-      id: prep-key
-      shell: bash
-      run: |
-        set -euo pipefail
-        KEY_PATH="$RUNNER_TEMP/medassistant_id"
-        printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > "$KEY_PATH"
-        sed -i 's/\r$//' "$KEY_PATH"
-        chmod 600 "$KEY_PATH"
-        echo "KEY_PATH=$KEY_PATH" >> "$GITHUB_OUTPUT"
-
-    - name: Upload compose & source (SCP)
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USER }}
-        port: ${{ secrets.SSH_PORT }}
-        key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
-        passphrase: ${{ secrets.VPS_PASSPHRASE }}
-        source: "./docker-compose.rendered.yml,./src.tgz"
-        target: "${{ secrets.DEPLOY_DIR }}/"
-        overwrite: true
-        debug: true
-
-    - name: Deploy on server (compose up -d)
-      uses: appleboy/ssh-action@v1.2.0
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USER }}
-        port: ${{ secrets.SSH_PORT }}
-        key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
-        passphrase: ${{ secrets.VPS_PASSPHRASE }}
-        script: |
+      - name: Pack source tree for server (git ls-files)
+        run: |
           set -euo pipefail
-          DEPLOY_DIR="${{ secrets.DEPLOY_DIR }}"
-          cd "$DEPLOY_DIR"
+          git ls-files \
+            | grep -vE '^\.github/|^\.env$|^artifacts/|^README\.md$' \
+            > /tmp/filelist.txt
+          tar -czf src.tgz -T /tmp/filelist.txt
+          ls -lh src.tgz
 
-          mkdir -p artifacts
-          tar xzf src.tgz
-          rm -f src.tgz
-          mv -f docker-compose.rendered.yml docker-compose.yml
+      - name: Verify payload exists
+        run: |
+          set -euo pipefail
+          test -s ./docker-compose.rendered.yml
+          test -s ./src.tgz
 
-          # NEW: создадим .env из секретов (compose его читает как env_file)
-          cat > .env <<'ENV'
-          TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
-          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-          OPENAI_ORG=${{ secrets.OPENAI_ORG }}
-          OPENAI_BASE_URL=${{ secrets.OPENAI_BASE_URL }}
-          MODEL_REASONING=${{ secrets.MODEL_REASONING }}
-          MODEL_FRIENDLY=${{ secrets.MODEL_FRIENDLY }}
-          DEBUG=${{ secrets.DEBUG }}
-          ENV
-          chmod 600 .env
+      # NEW: заранее создадим директорию деплоя на сервере (на случай, если её нет)
+      - name: Ensure deploy dir exists
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_PASSPHRASE }}
+          script: |
+            set -euo pipefail
+            mkdir -p "${{ secrets.DEPLOY_DIR }}"
 
-          # NEW: логин в GHCR (если образ приватный — иначе можно пропустить)
-          if [ -n "${{ secrets.GHCR_USERNAME }}" ] && [ -n "${{ secrets.GHCR_TOKEN }}" ]; then
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
-          fi
+      - name: Prepare SSH key (outside workspace)
+        id: prep-key
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEY_PATH="$RUNNER_TEMP/medassistant_id"
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > "$KEY_PATH"
+          sed -i 's/\r$//' "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          echo "KEY_PATH=$KEY_PATH" >> "$GITHUB_OUTPUT"
 
-          # запуск
-          docker compose up -d --force-recreate
-          docker compose ps
+      - name: Upload compose & source (SCP)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
+          passphrase: ${{ secrets.VPS_PASSPHRASE }}
+          source: "./docker-compose.rendered.yml,./src.tgz"
+          target: "${{ secrets.DEPLOY_DIR }}/"
+          overwrite: true
+          debug: true
 
-          echo "== On-server compose snippet =="
-          grep -nE '^\s*image:' docker-compose.yml || true
-          grep -nE '^\s*-\s*/' docker-compose.yml || true
+      - name: Deploy on server (compose up -d)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
+          passphrase: ${{ secrets.VPS_PASSPHRASE }}
+          script: |
+            set -euo pipefail
+            DEPLOY_DIR="${{ secrets.DEPLOY_DIR }}"
+            cd "$DEPLOY_DIR"
 
-          echo "== Mounts in bot (Source => Destination) =="
-          CID="$(docker compose ps -q bot)"
-          docker inspect -f '{{range .Mounts}}{{.Source}} => {{.Destination}}{{println}}{{end}}' "$CID" || true
+            mkdir -p artifacts
+            tar xzf src.tgz
+            rm -f src.tgz
+            mv -f docker-compose.rendered.yml docker-compose.yml
+
+            # NEW: создадим .env из секретов (compose его читает как env_file)
+            cat > .env <<'ENV'
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            OPENAI_ORG=${{ secrets.OPENAI_ORG }}
+            OPENAI_BASE_URL=${{ secrets.OPENAI_BASE_URL }}
+            MODEL_REASONING=${{ secrets.MODEL_REASONING }}
+            MODEL_FRIENDLY=${{ secrets.MODEL_FRIENDLY }}
+            DEBUG=${{ secrets.DEBUG }}
+            ENV
+            chmod 600 .env
+
+            # NEW: логин в GHCR (если образ приватный — иначе можно пропустить)
+            if [ -n "${{ secrets.GHCR_USERNAME }}" ] && [ -n "${{ secrets.GHCR_TOKEN }}" ]; then
+              echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+            fi
+
+            # запуск
+            docker compose up -d --force-recreate
+            docker compose ps
+
+            echo "== On-server compose snippet =="
+            grep -nE '^\s*image:' docker-compose.yml || true
+            grep -nE '^\s*-\s*/' docker-compose.yml || true
+
+            echo "== Mounts in bot (Source => Destination) =="
+            CID="$(docker compose ps -q bot)"
+            docker inspect -f '{{range .Mounts}}{{.Source}} => {{.Destination}}{{println}}{{end}}' "$CID" || true
