@@ -12,36 +12,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          ref: main
+            fetch-depth: 0
+            ref: main
 
       - name: List files (diagnostics)
         run: |
           pwd
           ls -la
-          echo "---- tree (top level) ----"
-          ls -la bot || true
-          ls -la tests || true
+          echo "---- bot ----"; ls -la bot || true
+          echo "---- tests ----"; ls -la tests || true
 
-      # Копируем весь репозиторий в целевую директорию на VPS
+      # Копируем весь репозиторий на сервер по SSH-ключу с passphrase
       - name: Upload project to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.VPS_HOST }}           # напр. 79.132.138.73
+          host: ${{ secrets.VPS_HOST }}            # напр. 79.132.138.73
           username: root
-          password: ${{ secrets.VPS_PASSPHRASE }} # пароль root
+          key: ${{ secrets.VPS_SSH_KEY }}          # приватный ключ (целиком, многострочный)
+          passphrase: ${{ secrets.VPS_PASSPHRASE }}# пароль от ключа
+          # host_fingerprint: ${{ secrets.VPS_HOST_FINGERPRINT }} # опционально, если добавишь
           source: |
             ./*
-          target: ${{ secrets.VPS_PATH }}         # напр. /opt/medassistant
+          target: ${{ secrets.VPS_PATH }}          # напр. /opt/medassistant
           overwrite: true
 
-      # Ставим зависимости, собираем .env из Secrets, создаём/рестартим systemd-сервис
       - name: Build on VPS & restart service
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: root
-          password: ${{ secrets.VPS_PASSPHRASE }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_PASSPHRASE }}
+          # host_fingerprint: ${{ secrets.VPS_HOST_FINGERPRINT }} # опционально
           script: |
             set -euo pipefail
 
@@ -51,17 +53,15 @@ jobs:
             mkdir -p "$APP_DIR"
             cd "$APP_DIR"
 
-            # Python venv
+            # Python venv + deps
             if [ ! -d ".venv" ]; then
               python3 -m venv .venv
             fi
             . .venv/bin/activate
             python -m pip install --upgrade pip
-            if [ -f requirements.txt ]; then
-              python -m pip install -r requirements.txt
-            fi
+            [ -f requirements.txt ] && python -m pip install -r requirements.txt
 
-            # Создаём .env из GitHub Secrets (не хранится в гите)
+            # .env из GitHub Secrets
             cat > .env <<'ENV'
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
@@ -73,7 +73,7 @@ jobs:
             ENV
             chmod 600 .env
 
-            # systemd unit (создаём/обновляем)
+            # systemd unit
             cat > /etc/systemd/system/${SERVICE_NAME}.service <<'UNIT'
             [Unit]
             Description=MedAssistant Telegram Bot
@@ -89,7 +89,6 @@ jobs:
             RestartSec=5
             User=root
             Group=root
-            # Логи в journalctl
             StandardOutput=journal
             StandardError=journal
 
@@ -100,6 +99,4 @@ jobs:
             systemctl daemon-reload
             systemctl enable ${SERVICE_NAME}.service || true
             systemctl restart ${SERVICE_NAME}.service
-
-            # Показать статус (всегда завершаться успешно, чтобы не ломать пайплайн)
             systemctl --no-pager -l status ${SERVICE_NAME}.service || true
