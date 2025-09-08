@@ -62,12 +62,11 @@ jobs:
         run: |
           set -euo pipefail
           check() { [ -n "$2" ] || { echo "❌ Missing secret: $1"; exit 1; }; }
-          check DEPLOY_DIR            "$DEPLOY_DIR"
-          check VPS_HOST              "$VPS_HOST"
-          check VPS_USER              "$VPS_USER"
-          check VPS_PORT              "$VPS_PORT"
-          check VPS_SSH_KEY           "$VPS_SSH_KEY"
-          # VPS_PASSPHRASE может быть пустым, если ключ без пароля — не проверяем
+          check DEPLOY_DIR  "$DEPLOY_DIR"
+          check VPS_HOST    "$VPS_HOST"
+          check VPS_USER    "$VPS_USER"
+          check VPS_PORT    "$VPS_PORT"
+          check VPS_SSH_KEY "$VPS_SSH_KEY"
 
       - name: Render compose with GHCR image & absolute DEPLOY_DIR
         run: |
@@ -91,29 +90,17 @@ jobs:
           test -s ./docker-compose.rendered.yml
           test -s ./src.tgz
 
-      - name: Prepare SSH key (outside workspace)
-        id: prep-key
-        shell: bash
-        run: |
-          set -euo pipefail
-          KEY_PATH="$RUNNER_TEMP/medassistant_id"
-          printf '%s\n' "$VPS_SSH_KEY" > "$KEY_PATH"
-          sed -i 's/\r$//' "$KEY_PATH"
-          chmod 600 "$KEY_PATH"
-          echo "KEY_PATH=$KEY_PATH" >> "$GITHUB_OUTPUT"
-
       - name: Ensure deploy dir exists
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          port: ${{ secrets.VPS_PORT }}
-          key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
-          passphrase: ${{ secrets.VPS_PASSPHRASE }}
+          host: ${{ env.VPS_HOST }}
+          username: ${{ env.VPS_USER }}
+          port: ${{ env.VPS_PORT }}
+          key: ${{ env.VPS_SSH_KEY }}          # <-- ключ целиком из секрета
+          passphrase: ${{ env.VPS_PASSPHRASE }} # <-- пароль ключа (если есть)
           script: |
             set -euo pipefail
-            mkdir -p "${{ secrets.DEPLOY_DIR }}"
-
+            mkdir -p "${{ env.DEPLOY_DIR }}"
 
       - name: Upload compose & source (SCP)
         uses: appleboy/scp-action@v0.1.7
@@ -121,7 +108,7 @@ jobs:
           host: ${{ env.VPS_HOST }}
           username: ${{ env.VPS_USER }}
           port: ${{ env.VPS_PORT }}
-          key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
+          key: ${{ env.VPS_SSH_KEY }}          # <-- ключ целиком из секрета
           passphrase: ${{ env.VPS_PASSPHRASE }}
           source: "./docker-compose.rendered.yml,./src.tgz"
           target: "${{ env.DEPLOY_DIR }}/"
@@ -131,34 +118,33 @@ jobs:
       - name: Deploy on server (compose up -d)
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          port: ${{ secrets.VPS_PORT }}
-          key_path: ${{ steps.prep-key.outputs.KEY_PATH }}
-          passphrase: ${{ secrets.VPS_PASSPHRASE }}
+          host: ${{ env.VPS_HOST }}
+          username: ${{ env.VPS_USER }}
+          port: ${{ env.VPS_PORT }}
+          key: ${{ env.VPS_SSH_KEY }}          # <-- ключ целиком из секрета
+          passphrase: ${{ env.VPS_PASSPHRASE }}
           script: |
             set -euo pipefail
-
-            cd "${{ secrets.DEPLOY_DIR }}"
+            cd "${{ env.DEPLOY_DIR }}"
 
             mkdir -p artifacts
             tar xzf src.tgz
             rm -f src.tgz
             mv -f docker-compose.rendered.yml docker-compose.yml
 
-            # генерим .env: подставляем secrets на стороне раннера (НЕ $VAR на сервере)
+            # .env без лидирующих пробелов
             cat > .env <<ENV
-            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
-            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-            OPENAI_ORG=${{ secrets.OPENAI_ORG }}
-            OPENAI_BASE_URL=${{ secrets.OPENAI_BASE_URL }}
-            MODEL_REASONING=${{ secrets.MODEL_REASONING }}
-            MODEL_FRIENDLY=${{ secrets.MODEL_FRIENDLY }}
-            DEBUG=${{ secrets.DEBUG }}
+            TELEGRAM_BOT_TOKEN=${{ env.TELEGRAM_BOT_TOKEN }}
+            OPENAI_API_KEY=${{ env.OPENAI_API_KEY }}
+            OPENAI_ORG=${{ env.OPENAI_ORG }}
+            OPENAI_BASE_URL=${{ env.OPENAI_BASE_URL }}
+            MODEL_REASONING=${{ env.MODEL_REASONING }}
+            MODEL_FRIENDLY=${{ env.MODEL_FRIENDLY }}
+            DEBUG=${{ env.DEBUG }}
             ENV
             chmod 600 .env
 
-            # при необходимости логин в GHCR (если образ приватный):
+            # Если образ приватный, можно разлогиниться в GHCR:
             # echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
 
             docker compose up -d --force-recreate
