@@ -1,9 +1,19 @@
-version: "3.9"
 services:
-  medassistant:
-    build: ./docker
+  bot:
+    image: __BOT_IMAGE__            # <-- рендерится в GH Actions
     env_file:
-      - .env
+      - ./.env                      # TELEGRAM_BOT_TOKEN, OPENAI_API_KEY, ...
+    environment:
+      PYTHONPATH: /app
+    working_dir: /app
+    command: python -m bot.main
     volumes:
-      - ./:/app
+      - ${DEPLOY_DIR}/artifacts:/app/artifacts
+      - ${DEPLOY_DIR}:/apps/medassistant
     restart: unless-stopped
+    pull_policy: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
